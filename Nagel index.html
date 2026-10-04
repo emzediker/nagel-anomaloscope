@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nagel Anomaloscope Simulator</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f4f6f8; color:#17202a; }
+  .wrap { max-width:1000px; margin:0 auto; padding:24px; }
+  h1 { margin:0 0 6px; font-size:30px; }
+  .subtitle { margin:0 0 20px; color:#52606d; }
+  .card { background:white; border-radius:16px; padding:22px; margin-bottom:18px; box-shadow:0 3px 14px rgba(0,0,0,.08); }
+  .controls { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .control label { display:flex; justify-content:space-between; font-weight:700; margin-bottom:8px; }
+  input[type=range] { width:100%; }
+  select { width:100%; padding:10px; border-radius:8px; border:1px solid #cbd5e1; font-size:16px; }
+  .field { display:flex; flex-direction:column; align-items:center; }
+  .field-title { font-weight:700; margin-bottom:8px; }
+  .nagel { display:grid; grid-template-rows:1fr 1fr; width:100%; max-width:720px; aspect-ratio:2.8/1; border:4px solid #202020; border-radius:10px; overflow:hidden; }
+  .half { display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; text-shadow:0 1px 2px rgba(0,0,0,.45); }
+  .top { border-bottom:3px solid #202020; }
+  .readout { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:18px; }
+  .metric { background:#f8fafc; border-radius:10px; padding:12px; text-align:center; }
+  .metric strong { display:block; font-size:22px; margin-top:3px; }
+  .status { margin-top:16px; padding:14px; border-radius:10px; text-align:center; font-weight:700; }
+  .match { background:#e7f6ec; color:#176b35; }
+  .nomatch { background:#fff1f0; color:#9b2c2c; }
+  .explain { line-height:1.5; color:#364152; }
+  .small { font-size:13px; color:#667085; }
+  @media(max-width:700px){ .controls,.readout{grid-template-columns:1fr;} .wrap{padding:14px;} h1{font-size:24px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>Nagel Anomaloscope Simulator</h1>
+    <p class="subtitle">Visual teaching model based on the classic Nagel anomaloscope / Rayleigh equation.</p>
+
+    <div class="control" style="margin-bottom:20px;">
+      <label for="mode">Observer type</label>
+      <select id="mode">
+        <option value="normal">Normal trichromacy</option>
+        <option value="deutanopia">Deuteranopia</option>
+        <option value="protanopia">Protanopia</option>
+        <option value="deutanomaly">Deuteranomaly</option>
+        <option value="protanomaly">Protanomaly</option>
+      </select>
+    </div>
+
+    <div class="controls">
+      <div class="control">
+        <label><span>Mixture scale</span><span id="mixVal">45</span></label>
+        <input id="mix" type="range" min="0" max="73" value="45">
+        <div class="small">0 = pure 546-nm green · 73 = pure 670-nm red</div>
+      </div>
+      <div class="control">
+        <label><span>Test-field radiance</span><span id="testVal">17</span></label>
+        <input id="test" type="range" min="0" max="87" value="17">
+        <div class="small">0 = very dim · 87 = bright</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <div class="field-title">Bipartite field</div>
+      <div class="nagel">
+        <div id="mixtureField" class="half top">MIXTURE FIELD</div>
+        <div id="testField" class="half">TEST FIELD</div>
+      </div>
+    </div>
+
+    <div class="readout">
+      <div class="metric">Mixture<strong id="mixRead">45</strong></div>
+      <div class="metric">Test<strong id="testRead">17</strong></div>
+      <div class="metric">Expected match<strong id="expected">45 / 17</strong></div>
+    </div>
+
+    <div id="status" class="status match">MATCH — fields are visually balanced in this teaching model.</div>
+  </div>
+
+  <div class="card explain">
+    <strong>How to use it</strong>
+    <ol>
+      <li>Select an observer type.</li>
+      <li>Adjust the mixture field and test-field radiance.</li>
+      <li>Ask students to find the matching point/range.</li>
+      <li>Compare their result with the expected Nagel pattern.</li>
+    </ol>
+    <p><strong>Teaching reference:</strong> normal ≈ 45/17; deuteranopia can match across 0–73 at ≈17; protanopia can match across 0–73 with test radiance changing from roughly 35 toward 5; deuteranomaly favors 0–45; protanomaly favors 45–73.</p>
+    <p class="small">This is a visual teaching approximation. Computer screens cannot reproduce the actual monochromatic 546-, 590-, and 670-nm stimuli of a calibrated clinical anomaloscope.</p>
+  </div>
+</div>
+
+<script>
+const mix = document.getElementById('mix');
+const test = document.getElementById('test');
+const mode = document.getElementById('mode');
+const mixVal = document.getElementById('mixVal');
+const testVal = document.getElementById('testVal');
+const mixRead = document.getElementById('mixRead');
+const testRead = document.getElementById('testRead');
+const expected = document.getElementById('expected');
+const status = document.getElementById('status');
+const mf = document.getElementById('mixtureField');
+const tf = document.getElementById('testField');
+
+function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+
+function expectedTest(m, type){
+  if(type==='normal') return 17;
+  if(type==='deutanopia') return 17;
+  if(type==='protanopia') return 35 - (30*m/73);
+  if(type==='deutanomaly') return 17;
+  if(type==='protanomaly') return 10;
+}
+
+function expectedMix(type){
+  if(type==='normal') return 45;
+  if(type==='deutanopia') return '0–73';
+  if(type==='protanopia') return '0–73';
+  if(type==='deutanomaly') return '0–45';
+  if(type==='protanomaly') return '45–73';
+}
+
+function isMatch(m,t,type){
+  const tolerance = 1.5;
+  if(type==='normal') return Math.abs(m-45)<=1.5 && Math.abs(t-17)<=1.5;
+  if(type==='deutanopia') return Math.abs(t-17)<=1.5;
+  if(type==='protanopia') return Math.abs(t-expectedTest(m,type))<=2.0;
+  if(type==='deutanomaly') return m>=0 && m<=45 && Math.abs(t-17)<=1.5;
+  if(type==='protanomaly') return m>=45 && m<=73 && Math.abs(t-10)<=1.5;
+}
+
+function colors(m,t){
+  // Deliberately constructed visual approximation with a guaranteed screen match at 45/17.
+  // Mix interpolates through green -> yellow -> red.
+  const p=m/73;
+  const r=Math.round(70 + 185*p);
+  const g=Math.round(180 - 135*Math.abs(p-0.62)/0.62);
+  const b=Math.round(55 - 35*p);
+  const testBase = {r:255,g:215,b:40};
+  const brightness = 0.35 + 0.65*(t/87);
+  const tr = Math.round(testBase.r*brightness);
+  const tg = Math.round(testBase.g*brightness);
+  const tb = Math.round(testBase.b*brightness);
+  return [`rgb(${r},${clamp(g,40,190)},${clamp(b,15,55)})`,`rgb(${tr},${tg},${tb})`];
+}
+
+function update(){
+  const m=+mix.value, t=+test.value, type=mode.value;
+  mixVal.textContent=m; testVal.textContent=t; mixRead.textContent=m; testRead.textContent=t;
+  expected.textContent = expectedMix(type) + ' / ' + (type==='protanopia' ? Math.round(expectedTest(m,type)) : expectedTest(m,type));
+  const [c1,c2]=colors(m,t);
+  mf.style.background=c1; tf.style.background=c2;
+  const dark1 = m>58, dark2=t<30;
+  mf.style.color=dark1?'white':'#111';
+  tf.style.color=dark2?'#111':'white';
+  const ok=isMatch(m,t,type);
+  status.className='status '+(ok?'match':'nomatch');
+  status.textContent=ok ? 'MATCH — fields are visually balanced in this teaching model.' : 'NO MATCH — adjust the mixture and/or test-field radiance.';
+}
+
+[mix,test,mode].forEach(x=>x.addEventListener('input',update));
+update();
+</script>
+</body>
+</html>
