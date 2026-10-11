@@ -1,0 +1,673 @@
+
+
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>CSF Perception Demonstration</title>
+
+<style>
+
+:root {
+
+  color-scheme: light;
+
+  --ink: #20252b;
+
+  --muted: #606b75;
+
+  --line: #d6dce2;
+
+  --accent: #2878b5;
+
+}
+
+* { box-sizing: border-box; }
+
+body {
+
+  margin: 0;
+
+  padding: 20px;
+
+  font-family: system-ui, -apple-system, sans-serif;
+
+  color: var(--ink);
+
+  background: #fff;
+
+}
+
+main { max-width: 1000px; margin: 0 auto; }
+
+h1 { font-size: 1.8rem; margin: 0 0 6px; }
+
+.intro { color: var(--muted); line-height: 1.5; }
+
+.grid {
+
+  display: grid;
+
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: 14px;
+
+}
+
+.panel {
+
+  border: 1px solid var(--line);
+
+  border-radius: 12px;
+
+  padding: 15px;
+
+  margin-bottom: 14px;
+
+  min-width: 0;
+
+}
+
+h2 { font-size: 1.05rem; margin: 0 0 14px; }
+
+label { font-weight: 600; }
+
+.value { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+input[type=range] {
+
+  display: block;
+
+  width: 100%;
+
+  margin: 12px 0 5px;
+
+  accent-color: var(--accent);
+
+}
+
+.range-labels {
+
+  display: flex;
+
+  justify-content: space-between;
+
+  color: var(--muted);
+
+  font-size: .78rem;
+
+}
+
+.control-row {
+
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  gap: 12px;
+
+}
+
+.second-control { margin-top: 22px; }
+
+.muted { color: var(--muted); }
+
+.small { font-size: .82rem; line-height: 1.45; }
+
+.status { border-radius: 8px; padding: 11px; font-weight: 700; margin: 14px 0 8px; }
+
+.good { background: #dff4e5; color: #155b32; }
+
+.bad { background: #fbe5e5; color: #8a2424; }
+
+.near { background: #fff0ce; color: #805300; }
+
+.neutral { background: #edf0f3; color: #333b43; }
+
+canvas { display: block; width: 100%; border-radius: 8px; }
+
+#perceived-image { height: 210px; background: #808080; }
+
+#csf-curve { height: 190px; background: white; }
+
+.buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+
+button {
+
+  border: 1px solid var(--line);
+
+  background: white;
+
+  border-radius: 8px;
+
+  padding: 10px 12px;
+
+  font: inherit;
+
+  cursor: pointer;
+
+}
+
+button:hover { background: #f0f4f7; }
+
+@media (max-width: 650px) {
+
+  body { padding: 12px; }
+
+  .grid { grid-template-columns: 1fr; }
+
+  .panel { padding: 12px; }
+
+  #perceived-image { height: 180px; }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<main>
+
+  <h1>Contrast Sensitivity Function (CSF)</h1>
+
+  <p class="intro">
+
+    Adjust spatial frequency and contrast to explore when a grating
+
+    is modeled as visible or below the observer's detection threshold.
+
+  </p>
+
+  <div class="grid">
+
+    <section class="panel">
+
+      <h2>Stimulus settings</h2>
+
+      <div class="control-row">
+
+        <label for="freq">Spatial frequency</label>
+
+        <span id="freq-v" class="value">4 cpd</span>
+
+      </div>
+
+      <input id="freq" type="range" min="0" max="300" step="1" value="160">
+
+      <div class="range-labels">
+
+        <span>0.1 cpd · low</span><span>100 cpd · high</span>
+
+      </div>
+
+      <div class="control-row second-control">
+
+        <label for="contrast">Contrast</label>
+
+        <span id="contrast-v" class="value">10%</span>
+
+      </div>
+
+      <input id="contrast" type="range" min="0" max="100" step="1" value="10">
+
+      <div class="range-labels">
+
+        <span>0%</span><span>100%</span>
+
+      </div>
+
+    </section>
+
+    <section class="panel">
+
+      <h2>Detection model</h2>
+
+      <div class="control-row">
+
+        <span class="muted">Contrast threshold</span>
+
+        <span id="threshold" class="value">1%</span>
+
+      </div>
+
+      <div class="control-row" style="margin-top:10px">
+
+        <span class="muted">Contrast / threshold</span>
+
+        <span id="ratio" class="value">10×</span>
+
+      </div>
+
+      <div id="status" class="status good" role="status" aria-live="polite">
+
+        Above detection threshold
+
+      </div>
+
+      <p id="explain" class="muted small">
+
+        Contrast is sufficiently above threshold for the grating to be visible.
+
+      </p>
+
+    </section>
+
+  </div>
+
+  <section class="panel">
+
+    <h2>What the observer perceives</h2>
+
+    <canvas id="perceived-image" width="600" height="240"></canvas>
+
+    <p id="note" class="muted small">
+
+      The grating is visible in this teaching simulation.
+
+    </p>
+
+  </section>
+
+  <section class="panel">
+
+    <h2>Illustrative contrast sensitivity function</h2>
+
+    <canvas id="csf-curve" width="600" height="230"></canvas>
+
+    <p class="muted small">
+
+      The threshold is lowest near 4 cycles/degree and rises at low
+
+      and high spatial frequencies. Values are illustrative for teaching,
+
+      not calibrated clinical measurements.
+
+    </p>
+
+  </section>
+
+  <div class="buttons">
+
+    <button id="low">Low frequency · 1%</button>
+
+    <button id="peak">Peak sensitivity · 1%</button>
+
+    <button id="high">100 cpd · 1%</button>
+
+    <button id="max">100 cpd · 100%</button>
+
+  </div>
+
+  <p class="muted small">
+
+    Teaching note: stripe spacing is schematic. The image intentionally
+
+    becomes uniform gray when the selected contrast is below the modeled
+
+    detection threshold. Actual detection varies with observer, viewing
+
+    distance, display, and visual conditions.
+
+  </p>
+
+</main>
+
+<script>
+
+(function () {
+
+  const $ = id => document.getElementById(id);
+
+  const freqSlider = $("freq");
+
+  const contrastSlider = $("contrast");
+
+  // Illustrative contrast thresholds, in percent contrast.
+
+  const anchors = [
+
+    [0.1,25], [0.2,15], [0.5,8], [1,5], [2,2],
+
+    [4,1], [6,1.3], [10,2], [15,5], [20,10],
+
+    [30,25], [50,60], [100,150]
+
+  ];
+
+  function selectedFrequency() {
+
+    return Math.pow(10, -1 + Number(freqSlider.value) / 300 * 3);
+
+  }
+
+  function thresholdAt(f) {
+
+    for (let i = 1; i < anchors.length; i++) {
+
+      if (f <= anchors[i][0]) {
+
+        const [x0, y0] = anchors[i - 1];
+
+        const [x1, y1] = anchors[i];
+
+        const q = (Math.log(f) - Math.log(x0)) /
+
+                  (Math.log(x1) - Math.log(x0));
+
+        return Math.exp(Math.log(y0) +
+
+                        q * (Math.log(y1) - Math.log(y0)));
+
+      }
+
+    }
+
+    return 150;
+
+  }
+
+  function drawGrating(canvas, f, contrast, fade) {
+
+    const ctx = canvas.getContext("2d");
+
+    const w = canvas.width;
+
+    const h = canvas.height;
+
+    const mid = 128;
+
+    const amplitude = 127 * contrast / 100 * fade;
+
+    ctx.fillStyle = "rgb(128,128,128)";
+
+    ctx.fillRect(0, 0, w, h);
+
+    if (contrast === 0 || fade === 0) return;
+
+    // Schematic stripe count; not a calibrated cpd-to-pixel conversion.
+
+    const cycles = Math.max(
+
+      2,
+
+      Math.min(55, Math.round(2 + Math.log10(f / 0.1 + 1) * 13))
+
+    );
+
+    const image = ctx.createImageData(w, h);
+
+    for (let x = 0; x < w; x++) {
+
+      const v = Math.round(
+
+        mid + amplitude * Math.cos(2 * Math.PI * cycles * x / w)
+
+      );
+
+      for (let y = 0; y < h; y++) {
+
+        const i = (y * w + x) * 4;
+
+        image.data[i] = v;
+
+        image.data[i + 1] = v;
+
+        image.data[i + 2] = v;
+
+        image.data[i + 3] = 255;
+
+      }
+
+    }
+
+    ctx.putImageData(image, 0, 0);
+
+  }
+
+  function drawCurve(f, threshold) {
+
+    const canvas = $("csf-curve");
+
+    const ctx = canvas.getContext("2d");
+
+    const w = canvas.width;
+
+    const h = canvas.height;
+
+    const L = 54, R = 15, T = 18, B = 35;
+
+    const gw = w - L - R;
+
+    const gh = h - T - B;
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.fillStyle = "#fff";
+
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = "#ddd";
+
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i <= 4; i++) {
+
+      const y = T + i * gh / 4;
+
+      ctx.beginPath();
+
+      ctx.moveTo(L, y);
+
+      ctx.lineTo(w - R, y);
+
+      ctx.stroke();
+
+    }
+
+    const X = v => L + (Math.log10(v) + 1) / 3 * gw;
+
+    const Y = v => T +
+
+      Math.log10(Math.max(0.5, Math.min(160, v)) / 0.5) /
+
+      Math.log10(160 / 0.5) * gh;
+
+    ctx.fillStyle = "#333";
+
+    ctx.font = "12px sans-serif";
+
+    ctx.textAlign = "center";
+
+    [0.1, 1, 4, 10, 100].forEach(v => {
+
+      ctx.fillText(String(v), X(v), h - 12);
+
+    });
+
+    ctx.fillText("Spatial frequency (cpd)", L + gw / 2, h - 1);
+
+    ctx.save();
+
+    ctx.translate(13, T + gh / 2);
+
+    ctx.rotate(-Math.PI / 2);
+
+    ctx.fillText("Threshold (%)", 0, 0);
+
+    ctx.restore();
+
+    ctx.strokeStyle = "#2878b5";
+
+    ctx.lineWidth = 3;
+
+    ctx.beginPath();
+
+    anchors.forEach((p, i) => {
+
+      if (i) ctx.lineTo(X(p[0]), Y(p[1]));
+
+      else ctx.moveTo(X(p[0]), Y(p[1]));
+
+    });
+
+    ctx.stroke();
+
+    ctx.fillStyle = "#c2410c";
+
+    ctx.beginPath();
+
+    ctx.arc(X(f), Y(threshold), 6, 0, Math.PI * 2);
+
+    ctx.fill();
+
+  }
+
+  function update() {
+
+    const f = selectedFrequency();
+
+    const contrast = Number(contrastSlider.value);
+
+    const threshold = thresholdAt(f);
+
+    const ratio = contrast / threshold;
+
+    $("freq-v").textContent =
+
+      (f < 1 ? f.toFixed(2) : f.toFixed(f % 1 ? 1 : 0)) + " cpd";
+
+    $("contrast-v").textContent = contrast + "%";
+
+    $("threshold").textContent =
+
+      threshold > 100 ? ">100%" : threshold.toFixed(1) + "%";
+
+    $("ratio").textContent =
+
+      contrast === 0 ? "0×" : ratio.toFixed(2) + "×";
+
+    const status = $("status");
+
+    let fade = 0;
+
+    if (contrast === 0) {
+
+      status.className = "status neutral";
+
+      status.textContent = "No contrast presented";
+
+      $("explain").textContent = "Contrast is set to zero.";
+
+      $("note").textContent =
+
+        "Uniform gray: no contrast modulation is presented.";
+
+    } else if (threshold > 100) {
+
+      status.className = "status bad";
+
+      status.textContent = "Not detectable in this model";
+
+      $("explain").textContent =
+
+        "The modeled threshold exceeds 100% contrast. Even maximum contrast cannot reach threshold.";
+
+      $("note").textContent =
+
+        "Uniform gray: the model predicts no detectable grating at this setting.";
+
+    } else if (contrast < threshold) {
+
+      status.className = "status bad";
+
+      status.textContent = "Below detection threshold";
+
+      $("explain").textContent =
+
+        "Stimulus contrast is below the modeled threshold.";
+
+      $("note").textContent =
+
+        "Uniform gray: the grating is hidden to represent a below-threshold stimulus.";
+
+    } else if (ratio < 1.5) {
+
+      fade = Math.max(0.18, Math.min(1, (ratio - 0.8) / 0.7));
+
+      status.className = "status near";
+
+      status.textContent = "Near threshold";
+
+      $("explain").textContent =
+
+        "The grating is modeled as faintly detectable.";
+
+      $("note").textContent =
+
+        "Faint grating: contrast is only modestly above threshold.";
+
+    } else {
+
+      fade = 1;
+
+      status.className = "status good";
+
+      status.textContent = "Above detection threshold";
+
+      $("explain").textContent =
+
+        "Contrast is sufficiently above threshold for the grating to be visible.";
+
+      $("note").textContent =
+
+        "The grating is visible because contrast exceeds the modeled threshold.";
+
+    }
+
+    drawGrating($("perceived-image"), f, contrast, fade);
+
+    drawCurve(f, threshold);
+
+  }
+
+  function setExample(f, contrast) {
+
+    freqSlider.value = Math.round((Math.log10(f) + 1) * 100);
+
+    contrastSlider.value = contrast;
+
+    update();
+
+  }
+
+  freqSlider.addEventListener("input", update);
+
+  contrastSlider.addEventListener("input", update);
+
+  $("low").addEventListener("click", () => setExample(0.5, 1));
+
+  $("peak").addEventListener("click", () => setExample(4, 1));
+
+  $("high").addEventListener("click", () => setExample(100, 1));
+
+  $("max").addEventListener("click", () => setExample(100, 100));
+
+  update();
+
+})();
+
+</script>
+
+</body>
+
+</html>
