@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Temporal Modulation Transfer Function (TMTF) Lab</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#172033;background:#f4f6fa}
+*{box-sizing:border-box}body{margin:0;padding:22px}.wrap{max-width:1000px;margin:auto}
+h1{font-size:clamp(1.6rem,4vw,2.3rem);margin:0 0 8px}.intro{color:#4b5563;margin:0 0 20px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.card{background:white;border:1px solid #dbe1ea;border-radius:16px;padding:18px;box-shadow:0 2px 8px #1720330a}
+h2{font-size:1.1rem;margin:0 0 14px}label{font-weight:600}input[type=range]{width:100%;accent-color:#247a58;margin:12px 0}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.buttons{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}
+button{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 11px;cursor:pointer;font:inherit}
+button:hover,button.active{background:#e5f4eb;border-color:#247a58}
+.small{font-size:.88rem;color:#5b6472;line-height:1.45}.big{font-size:1.25rem;font-weight:750;margin:8px 0}
+#stage{height:160px;border-radius:12px;background:#808080;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#lamp{width:96px;height:96px;border-radius:50%;background:#808080;box-shadow:0 0 24px #808080}
+canvas{width:100%;height:auto;display:block}.full{grid-column:1/-1}
+.note{background:#fff8e8;border:1px solid #f0d7a3;border-radius:12px;padding:12px;font-size:.88rem;color:#594b2e;line-height:1.45}
+@media(max-width:700px){body{padding:12px}.grid{grid-template-columns:1fr}.full{grid-column:auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Temporal Modulation Transfer Function (TMTF) Lab</h1>
+<p class="intro">Explore how flicker sensitivity changes with temporal frequency and modulation depth.</p>
+<div class="grid">
+<section class="card">
+<h2>1. Adjust the stimulus</h2>
+<div class="row"><label for="freq">Temporal frequency</label><strong id="freqVal">10 Hz</strong></div>
+<input id="freq" type="range" min="1" max="60" value="10">
+<div class="buttons" id="freqButtons">
+<button data-f="1">1 Hz</button><button data-f="3">3 Hz</button><button data-f="5">5 Hz</button><button data-f="10" class="active">10 Hz</button><button data-f="20">20 Hz</button><button data-f="30">30 Hz</button><button data-f="40">40 Hz</button><button data-f="50">50 Hz</button><button data-f="60">60 Hz</button>
+</div>
+<div class="row"><label for="mod">Modulation depth</label><strong id="modVal">5%</strong></div>
+<input id="mod" type="range" min="0" max="100" value="5">
+<div class="buttons" id="modButtons">
+<button data-m="5" class="active">5%</button><button data-m="10">10%</button><button data-m="25">25%</button><button data-m="50">50%</button><button data-m="75">75%</button><button data-m="100">100%</button>
+</div>
+<p class="small">Frequency controls how quickly brightness changes. Modulation depth controls the size of the brightness change.</p>
+</section>
+<section class="card">
+<h2>2. Perceived light (teaching simulation)</h2>
+<div id="stage"><div id="lamp"></div></div>
+<div id="state" class="big">Low-depth flicker detectable</div>
+<p id="description" class="small">At 10 Hz, even low modulation is detectable in this exaggerated model.</p>
+<p class="small">Below the model threshold, the light stays steady. Above threshold, pulsing represents perceived flicker.</p>
+</section>
+<section class="card full">
+<h2>3. Temporal modulation transfer function</h2>
+<p class="small">Illustrative threshold curve. Lower modulation threshold means greater sensitivity. The high-frequency cutoff represents temporal fusion.</p>
+<canvas id="graph" width="900" height="390" aria-label="Illustrative temporal modulation transfer function graph"></canvas>
+<div class="grid">
+<div><div class="small">Illustrative threshold</div><div id="threshold" class="big">3%</div></div>
+<div><div class="small">Current modulation</div><div id="currentMod" class="big">5%</div></div>
+</div>
+<p id="explain" class="small"></p>
+</section>
+<section class="note full"><strong>Instructor note:</strong> This is a deliberately exaggerated conceptual model, not calibrated clinical data. Real thresholds depend on luminance, stimulus size, viewing conditions, display refresh rate, and the observer. The cutoff shown is illustrative, not a universal human cutoff frequency.</section>
+</div>
+</div>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const freq = $('freq'), mod = $('mod'), canvas = $('graph'), ctx = canvas.getContext('2d');
+let phase = 0, last = performance.now();
+const cutoff = hz => hz >= 50;
+function threshold(hz) {
+  if (cutoff(hz)) return 101;
+  const x = Math.log10(hz / 10), sigma = x < 0 ? .49 : .48;
+  return Math.min(98, 3 + 97 * (1 - Math.exp(-.5 * (x / sigma) ** 2)));
+}
+function draw() {
+  const w=canvas.width,h=canvas.height,L=72,R=22,T=28,B=55,pw=w-L-R,ph=h-T-B;
+  ctx.clearRect(0,0,w,h);ctx.font='15px system-ui';ctx.fillStyle='#263244';ctx.strokeStyle='#dce2ea';ctx.lineWidth=1;
+  for(let p=0;p<=100;p+=20){const y=T+ph*(1-p/100);ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();ctx.fillText(p+'%',18,y+5);}
+  const X=v=>L+Math.log10(v)/Math.log10(60)*pw;
+  [1,2,3,5,10,20,30,40,50,60].forEach(v=>ctx.fillText(v+'',X(v)-9,h-27));
+  ctx.fillText('Relative sensitivity',L,T-9);ctx.fillText('Temporal frequency (Hz)',w/2-85,h-5);
+  ctx.beginPath();
+  for(let i=0;i<=400;i++){const hz=Math.pow(10,Math.log10(60)*i/400),x=X(hz),y=T+ph*(threshold(hz)/100);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}
+  ctx.lineTo(X(60),T+ph);ctx.lineTo(L,T+ph);ctx.closePath();ctx.fillStyle='rgba(36,122,88,.10)';ctx.fill();
+  ctx.beginPath();
+  for(let i=0;i<=400;i++){const hz=Math.pow(10,Math.log10(60)*i/400),x=X(hz),y=T+ph*(threshold(hz)/100);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}
+  ctx.strokeStyle='#247a58';ctx.lineWidth=4;ctx.stroke();
+  const hz=+freq.value,x=X(hz),sens=100-Math.min(100,threshold(hz)),y=T+ph*(1-sens/100);
+  ctx.setLineDash([6,5]);ctx.strokeStyle='#253044';ctx.beginPath();ctx.moveTo(x,T);ctx.lineTo(x,T+ph);ctx.stroke();ctx.setLineDash([]);
+  ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fillStyle='#253044';ctx.fill();
+  ctx.fillStyle='#263244';ctx.fillText('10 Hz peak',Math.min(X(10)+10,w-130),T+17);ctx.fillText('Fusion',X(50)-25,T+ph-12);
+}
+function update(){
+  const hz=+freq.value,depth=+mod.value,th=threshold(hz),isCutoff=cutoff(hz),detect=!isCutoff&&depth>=th&&depth>0;
+  $('freqVal').textContent=hz+' Hz';$('modVal').textContent=depth+'%';$('threshold').textContent=isCutoff?'No detection at 100%':Math.round(th)+'%';$('currentMod').textContent=depth+'%';
+  if(isCutoff){$('state').textContent='Flicker fused — steady appearance';$('description').textContent='At this illustrative high-frequency cutoff, even 100% modulation does not produce perceived flicker.';}
+  else if(depth===0){$('state').textContent='No modulation';$('description').textContent='The light has no brightness variation.';}
+  else if(detect){$('state').textContent=depth<=10?'Low-depth flicker detectable':'Flicker detectable';$('description').textContent='The modulation exceeds the illustrative threshold at this frequency.';}
+  else{$('state').textContent='Flicker virtually undetectable';$('description').textContent='The modulation is below threshold. Increase depth to reveal the flicker.';}
+  $('explain').textContent=isCutoff?'Fusion region: rapid modulation is perceived as steady in this illustrative model.':detect?'At '+hz+' Hz, '+depth+'% modulation is above the illustrative threshold.':'At '+hz+' Hz, '+depth+'% modulation is below the illustrative threshold.';
+  document.querySelectorAll('[data-f]').forEach(b=>b.classList.toggle('active',+b.dataset.f===hz));
+  document.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('active',+b.dataset.m===depth));
+  draw();
+}
+freq.addEventListener('input',update);mod.addEventListener('input',update);
+document.querySelectorAll('[data-f]').forEach(b=>b.addEventListener('click',()=>{freq.value=b.dataset.f;update()}));
+document.querySelectorAll('[data-m]').forEach(b=>b.addEventListener('click',()=>{mod.value=b.dataset.m;update()}));
+$('reset').addEventListener('click',()=>{freq.value=10;mod.value=5;update()});
+function animate(now){
+  if(!document.body.isConnected)return;
+  const dt=Math.min(50,now-last);last=now;phase+=dt/1000;
+  const hz=+freq.value,depth=+mod.value,visible=!cutoff(hz)&&depth>=threshold(hz)&&depth>0;
+  const lum=visible?Math.round(128+127*depth/100*Math.sin(2*Math.PI*hz*phase)):128;
+  const color=`rgb(${lum},${lum},${lum})`;
+  $('stage').style.background=color;$('lamp').style.background=color;$('lamp').style.boxShadow='0 0 24px '+color;
+  requestAnimationFrame(animate);
+}
+update();requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
