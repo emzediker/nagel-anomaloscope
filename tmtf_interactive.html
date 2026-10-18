@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f8fa">
+<title>TMTF Interactive Teaching Demo</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#202124;background:#f6f8fa;--accent:#287c5a;--line:#d7dde2;--muted:#5e6872}*{box-sizing:border-box}body{margin:0;padding:clamp(10px,3vw,24px)}main{max-width:900px;margin:auto;display:grid;gap:14px}header h1{font-size:clamp(1.35rem,4vw,1.8rem);margin:0 0 5px}h2{font-size:1.08rem;margin:0 0 12px}.panel{background:#fff;border:1px solid var(--line);border-radius:15px;padding:clamp(13px,3vw,18px)}.row{display:flex;justify-content:space-between;align-items:center;gap:12px}.controls{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0 14px}button{font:inherit;font-size:.94rem;color:inherit;background:#fff;border:1px solid #c8d0d6;border-radius:9px;padding:9px 12px;min-height:40px;cursor:pointer;touch-action:manipulation}button:focus-visible,input:focus-visible{outline:3px solid #83b9a0;outline-offset:2px}button.active{background:#e1f1e9;border-color:var(--accent);font-weight:650}input[type=range]{display:block;width:100%;margin:12px 0 6px;accent-color:var(--accent);cursor:pointer;min-height:28px}.muted{font-size:.86rem;color:var(--muted);line-height:1.45}.big{font-size:1.15rem;font-weight:750;line-height:1.3}.stage{height:160px;border-radius:12px;background:#808080;display:flex;align-items:center;justify-content:center;overflow:hidden}.bulb{width:90px;height:90px;border-radius:50%;background:#808080;box-shadow:0 0 24px #808080}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.foot{font-size:.8rem;color:var(--muted);line-height:1.45}.graph{display:block;width:100%;height:auto}.quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.quick button{width:100%}@media(max-width:560px){.quick{grid-template-columns:1fr}.stage{height:140px}.panel{padding:13px}}
+</style>
+</head>
+<body>
+<main id="tmtfApp">
+<header><h1>Temporal Modulation Transfer Function</h1><div class="muted">Interactive, exaggerated conceptual model of temporal sensitivity and flicker fusion.</div></header>
+<section class="panel">
+<h2>Stimulus controls</h2>
+<div class="row"><label for="frequency">Temporal frequency</label><strong id="frequencyValue">10 Hz</strong></div>
+<input id="frequency" type="range" min="1" max="60" step="1" value="10">
+<div class="controls" id="frequencyButtons"><button type="button" data-frequency="1">1 Hz</button><button type="button" data-frequency="3">3 Hz</button><button type="button" data-frequency="5">5 Hz</button><button type="button" data-frequency="10" class="active">10 Hz</button><button type="button" data-frequency="20">20 Hz</button><button type="button" data-frequency="30">30 Hz</button><button type="button" data-frequency="40">40 Hz</button><button type="button" data-frequency="50">50 Hz</button><button type="button" data-frequency="60">60 Hz</button></div>
+<div class="row"><label for="modulation">Modulation depth</label><strong id="modulationValue">5%</strong></div>
+<input id="modulation" type="range" min="0" max="100" step="1" value="5">
+<div class="controls" id="modulationButtons"><button type="button" data-modulation="5" class="active">5%</button><button type="button" data-modulation="10">10%</button><button type="button" data-modulation="25">25%</button><button type="button" data-modulation="50">50%</button><button type="button" data-modulation="75">75%</button><button type="button" data-modulation="100">100%</button></div>
+</section>
+<section class="panel"><h2>Perceived light</h2><div class="stage" id="lightStage"><div class="bulb" id="lightBulb"></div></div><p class="big" id="perceptionStatus" aria-live="polite">Low-depth flicker detectable</p><p class="muted" id="perceptionDescription">At 10 Hz, the model makes low-depth modulation detectable.</p><p class="muted">The displayed light represents the model's predicted perception: below threshold it remains steady; above threshold it pulses. This is a teaching visualization, not a physical measurement.</p></section>
+<section class="panel"><h2>Temporal modulation transfer function</h2><p class="muted">Lower modulation threshold means greater sensitivity. The curve peaks near 10 Hz and falls toward a high-frequency fusion cutoff.</p><canvas id="tmtfGraph" class="graph" width="700" height="310" role="img" aria-label="Illustrative temporal sensitivity curve with a peak near 10 hertz and high frequency fusion cutoff"></canvas><div class="metrics"><div><div class="muted">Illustrative threshold</div><div class="big" id="thresholdValue">3%</div></div><div><div class="muted">Current modulation</div><div class="big" id="depthValue">5%</div></div></div><p class="muted" id="graphExplanation">The selected modulation is above the illustrative threshold.</p></section>
+<section class="panel"><h2>Quick comparisons</h2><div class="quick"><button type="button" id="peakPreset">10 Hz · high sensitivity · 5%</button><button type="button" id="lowPreset">2 Hz · lower sensitivity · 5%</button><button type="button" id="midPreset">30 Hz · reduced sensitivity · 25%</button><button type="button" id="fusionPreset">50 Hz · fusion cutoff · 100%</button><button type="button" id="resetButton">Reset demonstration</button></div></section>
+<footer class="foot">Educational illustration, not measured clinical data. Actual thresholds vary with luminance, stimulus size, display refresh rate, and observer. The cutoff shown is illustrative, not a universal human cutoff frequency.</footer>
+</main>
+<script>
+(function(){
+'use strict';
+function init(){
+ const $=id=>document.getElementById(id);
+ const frequency=$('frequency'), modulation=$('modulation'), canvas=$('tmtfGraph');
+ const ctx=canvas.getContext('2d');
+ let phase=0,lastTime=0,animationId=null;
+ const fusionCutoff=50;
+ function isFusion(hz){return hz>=fusionCutoff;}
+ // Threshold is intentionally exaggerated for classroom clarity: minimum at 10 Hz.
+ function threshold(hz){
+   if(isFusion(hz)) return 101;
+   const x=Math.log10(hz/10),sigma=x<0?0.49:0.48;
+   return Math.min(98,3+97*(1-Math.exp(-0.5*Math.pow(x/sigma,2))));
+ }
+ function drawGraph(){
+   const w=700,h=310,L=58,R=16,T=20,B=43,pw=w-L-R,ph=h-T-B;
+   const fg='#202124',grid='#d7dde2';
+   ctx.clearRect(0,0,w,h);ctx.font='12px system-ui, sans-serif';ctx.fillStyle=fg;ctx.strokeStyle=grid;ctx.lineWidth=1;
+   for(let p=0;p<=100;p+=20){const y=T+ph*(1-p/100);ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();ctx.fillText(p+'%',12,y+4);}
+   const X=v=>L+Math.log10(v)/Math.log10(60)*pw;
+   [1,2,3,5,10,20,30,40,50,60].forEach(v=>ctx.fillText(String(v),X(v)-7,h-22));
+   ctx.fillText('Relative sensitivity',L,T-6);ctx.fillText('Temporal frequency (Hz)',w/2-65,h-4);
+   ctx.beginPath();
+   for(let i=0;i<=350;i++){const hz=Math.pow(10,Math.log10(60)*i/350),sens=100-Math.min(100,threshold(hz)),x=X(hz),y=T+ph*(1-sens/100);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}
+   ctx.strokeStyle='#287c5a';ctx.lineWidth=3;ctx.stroke();
+   const hz=+frequency.value,x=X(hz),sens=100-Math.min(100,threshold(hz)),y=T+ph*(1-sens/100);
+   ctx.setLineDash([5,4]);ctx.strokeStyle=fg;ctx.beginPath();ctx.moveTo(x,T);ctx.lineTo(x,T+ph);ctx.stroke();ctx.setLineDash([]);
+   ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.fillStyle=fg;ctx.fill();
+   ctx.fillText('10 Hz peak',Math.min(X(10)+8,w-100),T+12);ctx.fillText('Fusion',X(50)-20,T+ph-9);
+ }
+ function update(){
+   const hz=Number(frequency.value),depth=Number(modulation.value),th=threshold(hz),fusion=isFusion(hz),detectable=!fusion&&depth>=th&&depth>0;
+   $('frequencyValue').textContent=hz+' Hz';$('modulationValue').textContent=depth+'%';$('depthValue').textContent=depth+'%';
+   $('thresholdValue').textContent=fusion?'No detection at 100%':Math.round(th)+'%';
+   if(fusion){$('perceptionStatus').textContent='Flicker fused — steady appearance';$('perceptionDescription').textContent='This is beyond the model’s high-frequency cutoff. Even 100% modulation does not produce perceived flicker.';}
+   else if(depth===0){$('perceptionStatus').textContent='No modulation';$('perceptionDescription').textContent='The light has no brightness variation.';}
+   else if(detectable){$('perceptionStatus').textContent=depth<=10?'Low-depth flicker detectable':'Flicker detectable';$('perceptionDescription').textContent='The modulation exceeds the model threshold at this frequency.';}
+   else{$('perceptionStatus').textContent='Flicker virtually undetectable';$('perceptionDescription').textContent='The modulation is below threshold. Increase modulation depth to reveal flicker.';}
+   $('graphExplanation').textContent=fusion?'Fusion region: rapid modulation is perceived as steady in this illustrative model.':detectable?'The selected modulation is above the illustrative threshold.':'The selected modulation is below the illustrative threshold.';
+   document.querySelectorAll('[data-frequency]').forEach(b=>b.classList.toggle('active',Number(b.dataset.frequency)===hz));
+   document.querySelectorAll('[data-modulation]').forEach(b=>b.classList.toggle('active',Number(b.dataset.modulation)===depth));
+   drawGraph();
+ }
+ function animate(now){
+   if(!document.getElementById('tmtfApp'))return;
+   if(!lastTime)lastTime=now;const dt=Math.min(50,now-lastTime);lastTime=now;phase+=dt/1000;
+   const hz=Number(frequency.value),depth=Number(modulation.value),visible=!isFusion(hz)&&depth>=threshold(hz)&&depth>0;
+   const lum=visible?Math.round(128+127*depth/100*Math.sin(2*Math.PI*hz*phase)):128;
+   const color='rgb('+lum+','+lum+','+lum+')';$('lightStage').style.background=color;$('lightBulb').style.background=color;$('lightBulb').style.boxShadow='0 0 24px '+color;
+   animationId=requestAnimationFrame(animate);
+ }
+ frequency.addEventListener('input',update);modulation.addEventListener('input',update);
+ document.querySelectorAll('[data-frequency]').forEach(b=>b.addEventListener('click',()=>{frequency.value=b.dataset.frequency;update();}));
+ document.querySelectorAll('[data-modulation]').forEach(b=>b.addEventListener('click',()=>{modulation.value=b.dataset.modulation;update();}));
+ function preset(hz,depth){frequency.value=hz;modulation.value=depth;update();}
+ $('peakPreset').addEventListener('click',()=>preset(10,5));$('lowPreset').addEventListener('click',()=>preset(2,5));$('midPreset').addEventListener('click',()=>preset(30,25));$('fusionPreset').addEventListener('click',()=>preset(50,100));$('resetButton').addEventListener('click',()=>preset(10,5));
+ update();animationId=requestAnimationFrame(animate);
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
+</script>
+</body>
+</html>
